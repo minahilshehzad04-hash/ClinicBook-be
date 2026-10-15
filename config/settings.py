@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 import environ
 
@@ -31,6 +32,9 @@ DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = []
 
+# Where the Next.js app lives. Used to build the link in verification emails.
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000").rstrip("/")
+
 
 # Application definition
 
@@ -43,7 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     "rest_framework",
     "corsheaders",
-    "core",
+    "accounts",
     "rest_framework_simplejwt.token_blacklist",
 ]
 
@@ -70,7 +74,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_THROTTLE_RATES": {"login": "5/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "5/min",
+        "resend_verification": "5/hour",
+    },
+    "EXCEPTION_HANDLER": "accounts.exceptions.api_exception_handler",
 }
 
 
@@ -82,6 +90,8 @@ SIMPLE_JWT = {
 }
 
 ROOT_URLCONF = 'config.urls'
+
+AUTH_USER_MODEL = "accounts.User"
 
 TEMPLATES = [
     {
@@ -129,6 +139,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Verification links stay valid for 24 hours (seconds). Django's token generator
+# reads this setting; the app has no password-reset flow, so it only affects
+# the email-verification links.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
@@ -139,8 +154,6 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
@@ -150,9 +163,34 @@ STATIC_URL = 'static/'
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# Django 6.1 configures email with MAILERS (EMAIL_HOST, EMAIL_PORT, ... are deprecated).
+# With no EMAIL_HOST_USER in .env, emails are printed in the `runserver` terminal.
+# With it set, they go out through real SMTP.
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+_smtp_user = env("EMAIL_HOST_USER", default="")
+
+if _smtp_user:
+    _smtp_port = env.int("EMAIL_PORT", default=465)
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': env("EMAIL_HOST", default="smtp.gmail.com"),
+                'port': _smtp_port,
+                'username': _smtp_user,
+                'password': env("EMAIL_HOST_PASSWORD"),
+                'use_ssl': _smtp_port == 465,
+                'use_tls': _smtp_port != 465,
+                'timeout': 10,
+            },
+        },
+    }
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        },
+    }
+
+    
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="ClinicBook <no-reply@clinicbook.local>")

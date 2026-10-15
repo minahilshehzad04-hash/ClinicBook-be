@@ -15,11 +15,26 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.db import connection
+from django.http import JsonResponse
+from django.urls import include, path
+
+from accounts.urls import patient_urlpatterns
+
+
+def health(request):
+    """GET /health -- works without auth, reports DB status."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return JsonResponse({"status": "ok", "db": "up"})
+    except Exception:
+        return JsonResponse({"status": "error", "db": "down"}, status=503)
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("health", health, name="health"),
     path("api/v1/auth/", include("accounts.urls")),
+    path("api/v1/patients/", include((patient_urlpatterns, "patients"))),
 ]
-
