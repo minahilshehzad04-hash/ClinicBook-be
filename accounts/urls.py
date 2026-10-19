@@ -9,6 +9,8 @@ from .views import (
     PatientRegisterView,
     ResendVerificationView,
     VerifyEmailView,
+    DoctorDashboardView,
+    DoctorProfileView,      # new (note the comma after DoctorDashboardView above)
 )
 
 # Mounted at /api/v1/auth/
@@ -22,7 +24,15 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
 ]
 
-# Mounted at /api/v1/patients/
+# Mounted at /api/v1/patients/  ->  /api/v1/patients/dashboard/
 patient_urlpatterns = [
     path("dashboard/", PatientDashboardView.as_view(), name="patient-dashboard"),
 ]
+
+# Mounted at /api/v1/doctors/   ->  /api/v1/doctors/dashboard/
+# Mounted at /api/v1/doctors/   ->  /api/v1/doctors/dashboard/ and /me/
+doctor_urlpatterns = [
+    path("dashboard/", DoctorDashboardView.as_view(), name="doctor-dashboard"),
+    path("me/", DoctorProfileView.as_view(), name="doctor-me"),   # new
+] 
+

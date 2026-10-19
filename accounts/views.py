@@ -10,9 +10,13 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .emails import send_verification_email
-from .models import User
-from .permissions import IsPatient
-from .serializers import PatientRegistrationSerializer, UserSummarySerializer
+from .models import User, DoctorProfile
+from .permissions import IsDoctor, IsPatient
+from .serializers import (
+    DoctorProfileSerializer, PatientRegistrationSerializer,
+    ProfileUpdateSerializer, UserSummarySerializer,
+)
+from rest_framework.exceptions import ValidationError
 from .tokens import email_token_generator
 
 
@@ -30,9 +34,9 @@ def build_auth_response(user, message, http_status=status.HTTP_200_OK):
 
 
 class PatientRegisterView(generics.CreateAPIView):
-    """"New user" form. Creates a patient (unverified) and emails a
-    verification link. The patient is NOT signed in: they must verify first,
-    then log in."""
+    """"New user" form for patients and doctors. Creates the account
+    (unverified) and emails a verification link. The user is NOT signed in:
+    they must verify first, then log in."""
 
     serializer_class = PatientRegistrationSerializer
     permission_classes = [permissions.AllowAny]
@@ -44,7 +48,7 @@ class PatientRegisterView(generics.CreateAPIView):
             user = serializer.save()
 
         # Sent after the user is saved. If SMTP fails the account still exists
-        # and the patient can use "Resend" on the frontend.
+        # and the user can use "Resend" on the frontend.
         email_sent = send_verification_email(user)
         return Response(
             {
@@ -99,7 +103,7 @@ class ResendVerificationView(APIView):
         email = str(request.data.get("email", "")).strip()
         user = User.objects.filter(
             email__iexact=email,
-            role=User.Role.PATIENT,
+            role__in=[User.Role.PATIENT, User.Role.DOCTOR],
             is_email_verified=False,
             is_active=True,
         ).first()
@@ -111,7 +115,8 @@ class ResendVerificationView(APIView):
 
 
 class LoginView(APIView):
-    """Login page. `identifier` is the email or phone number."""
+    """Login page for every role. `identifier` is the email or phone number.
+    The response includes `user.role`, which the frontend uses to redirect."""
 
     permission_classes = [permissions.AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -146,9 +151,13 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Only patients self-register, so only they need to verify their email.
-        # (Checked after the password, so this never reveals who has an account.)
-        if user.role == User.Role.PATIENT and not user.is_email_verified:
+        # Patients and doctors sign up themselves, so both must verify their
+        # email. (The seeded admin is created already verified.)
+        # Checked after the password, so this never reveals who has an account.
+        if (
+            user.role in (User.Role.PATIENT, User.Role.DOCTOR)
+            and not user.is_email_verified
+        ):
             return Response(
                 {
                     "error": "Please verify your email before logging in.",
@@ -175,13 +184,40 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    """Current user's profile, any role."""
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(UserSummarySerializer(request.user).data)
 
+    def patch(self, request):
+        s = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(UserSummarySerializer(request.user).data)
+
+
+class DoctorProfileView(APIView):
+    """PATCH the signed-in doctor's personal + professional details. Doctors only."""
+
+    permission_classes = [IsDoctor]
+
+    def patch(self, request):
+        profile, _ = DoctorProfile.objects.get_or_create(user=request.user)
+        user_s = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        prof_s = DoctorProfileSerializer(profile, data=request.data, partial=True)
+
+        user_ok, prof_ok = user_s.is_valid(), prof_s.is_valid()
+        if not (user_ok and prof_ok):
+            raise ValidationError({**user_s.errors, **prof_s.errors})
+
+        with transaction.atomic():   # both saved, or neither
+            user_s.save()
+            prof_s.save()
+
+        return Response({
+            "doctor": UserSummarySerializer(request.user).data,
+            "profile": DoctorProfileSerializer(profile).data,
+        })
 
 class PatientDashboardView(APIView):
     """Landing page after login. Patients only."""
@@ -193,5 +229,23 @@ class PatientDashboardView(APIView):
             {
                 "message": f"Welcome, {request.user.first_name}.",
                 "patient": UserSummarySerializer(request.user).data,
+            }
+        )
+
+
+class DoctorDashboardView(APIView):
+    """Landing page after login. Doctors only."""
+
+    permission_classes = [IsDoctor]
+
+    def get(self, request):
+        user = request.user
+        name = user.last_name or user.first_name or user.username
+        profile, _ = DoctorProfile.objects.get_or_create(user=user)
+        return Response(
+            {
+                "message": f"Welcome, Dr. {name}.",
+                "doctor": UserSummarySerializer(user).data,
+                "profile": DoctorProfileSerializer(profile).data,
             }
         )
