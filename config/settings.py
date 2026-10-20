@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "accounts",
+    "schedule",
     "rest_framework_simplejwt.token_blacklist",
 ]
 
@@ -121,6 +122,10 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
 USE_TZ = True
 
+
+# MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware", ...]  # put it first
+# CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
+
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
@@ -150,9 +155,8 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
+TIME_ZONE = "Asia/Karachi"
+USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)

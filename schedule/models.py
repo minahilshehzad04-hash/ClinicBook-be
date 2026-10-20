@@ -38,8 +38,43 @@ class WeeklyAvailability(models.Model):
                 fields=["doctor", "weekday", "start_time", "end_time"],
                 name="availability_no_exact_duplicate",
             ),
-        ]
+        ] 
         indexes = [models.Index(fields=["doctor", "weekday"])]
 
     def __str__(self):
         return f"{self.doctor} {self.get_weekday_display()} {self.start_time}-{self.end_time}"
+
+
+
+class Appointment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        CONFIRMED = "confirmed"
+        REJECTED = "rejected"
+        CANCELLED = "cancelled"
+
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                related_name="appointments_as_patient")
+    doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                               related_name="appointments_as_doctor")
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start"]
+        constraints = [
+            # Same doctor + same start can't have two active requests
+            models.UniqueConstraint(
+                fields=["doctor", "start"],
+                condition=Q(status__in=["pending", "confirmed"]),
+                name="one_active_appointment_per_slot",
+            ),
+        ]
+
+
+        
+    
