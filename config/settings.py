@@ -30,7 +30,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 # Where the Next.js app lives. Used to build the link in verification emails.
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000").rstrip("/")
