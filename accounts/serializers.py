@@ -1,10 +1,12 @@
+from datetime import date
+
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from datetime import date
+
 from .models import User, DoctorProfile
 
 
-class PatientRegistrationSerializer(serializers.ModelSerializer):
+class RegistrationSerializer(serializers.ModelSerializer):
     """Public sign-up form for patients AND doctors."""
 
     password = serializers.CharField(
@@ -41,9 +43,7 @@ class PatientRegistrationSerializer(serializers.ModelSerializer):
         value = value.strip()
 
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError(
-                "This username is already taken."
-            )
+            raise serializers.ValidationError("This username is already taken.")
 
         return value
 
@@ -51,9 +51,15 @@ class PatientRegistrationSerializer(serializers.ModelSerializer):
         value = value.strip().lower()
 
         if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError(
-                "This email is already registered."
-            )
+            raise serializers.ValidationError("This email is already registered.")
+
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+
+        if value and User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("This phone number is already in use.")
 
         return value
 
@@ -107,8 +113,14 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
-        fields = ["specialty", "qualification", "years_of_experience",
-                  "license_number", "consultation_fee", "bio"]
+        fields = [
+            "specialty",
+            "qualification",
+            "years_of_experience",
+            "license_number",
+            "consultation_fee",
+            "bio",
+        ]
 
     def validate_license_number(self, value):
         return (value or "").strip() or None

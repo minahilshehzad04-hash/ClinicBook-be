@@ -19,7 +19,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
 
-from accounts.urls import doctor_urlpatterns, patient_urlpatterns
+from accounts.urls import doctor_urlpatterns, patient_urlpatterns, admin_urlpatterns
 
 
 def health(request):
@@ -40,4 +40,5 @@ urlpatterns = [
     path("api/v1/doctors/schedule/", include("schedule.urls")),
     path("api/v1/doctors/", include("schedule.patient_urls")),
     path("api/v1/doctors/", include((doctor_urlpatterns, "doctors"))),
+    path("api/v1/admin/", include((admin_urlpatterns, "admin-api"))),
 ]

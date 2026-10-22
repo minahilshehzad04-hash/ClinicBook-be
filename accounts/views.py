@@ -11,9 +11,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .emails import send_verification_email
 from .models import User, DoctorProfile
-from .permissions import IsDoctor, IsPatient
+from .permissions import IsDoctor, IsPatient, IsAdmin
 from .serializers import (
-    DoctorProfileSerializer, PatientRegistrationSerializer,
+    DoctorProfileSerializer, RegistrationSerializer,
     ProfileUpdateSerializer, UserSummarySerializer,
 )
 from rest_framework.exceptions import ValidationError
@@ -33,12 +33,12 @@ def build_auth_response(user, message, http_status=status.HTTP_200_OK):
     )
 
 
-class PatientRegisterView(generics.CreateAPIView):
+class RegisterView(generics.CreateAPIView):
     """"New user" form for patients and doctors. Creates the account
     (unverified) and emails a verification link. The user is NOT signed in:
     they must verify first, then log in."""
 
-    serializer_class = PatientRegistrationSerializer
+    serializer_class = RegistrationSerializer
     permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
@@ -175,13 +175,14 @@ class LogoutView(APIView):
     def post(self, request):
         try:
             RefreshToken(request.data.get("refresh", "")).blacklist()
+        
         except TokenError:
             return Response(
                 {"error": "Invalid or expired refresh token.", "code": "invalid_token"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_205_RESET_CONTENT)
-
+    
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -249,3 +250,29 @@ class DoctorDashboardView(APIView):
                 "profile": DoctorProfileSerializer(profile).data,
             }
         )
+
+
+class AdminDashboardView(APIView):
+    """Landing page after login. Admins only."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        name = request.user.first_name or request.user.username
+        recent = User.objects.exclude(role=User.Role.ADMIN).order_by("-date_joined")[:5]
+        return Response(
+            {
+                "message": f"Welcome, {name}.",
+                "admin": UserSummarySerializer(request.user).data,
+                "stats": {
+                    "patients": User.objects.filter(role=User.Role.PATIENT).count(),
+                    "doctors": User.objects.filter(role=User.Role.DOCTOR).count(),
+                    "unverified_users": User.objects.filter(
+                        role__in=[User.Role.PATIENT, User.Role.DOCTOR],
+                        is_email_verified=False,
+                    ).count(),
+                    "inactive_users": User.objects.filter(is_active=False).count(),
+                },
+                "recent_users": UserSummarySerializer(recent, many=True).data,
+            }
+        )        

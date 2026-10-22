@@ -79,12 +79,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
     )
     duration = serializers.IntegerField(write_only=True, min_value=10, max_value=240, default=30)
     patient_name = serializers.SerializerMethodField()
+    patient_id = serializers.IntegerField(read_only=True)
     doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
         fields = [
-            "id", "doctor", "doctor_name", "patient_name",
+            "id", "doctor", "doctor_name", "patient_id", "patient_name",
             "start", "end", "duration", "reason", "status",
         ]
         read_only_fields = ["end", "status"]

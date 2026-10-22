@@ -6,16 +6,17 @@ from .views import (
     LogoutView,
     MeView,
     PatientDashboardView,
-    PatientRegisterView,
+    RegisterView,
     ResendVerificationView,
     VerifyEmailView,
     DoctorDashboardView,
-    DoctorProfileView,      # new (note the comma after DoctorDashboardView above)
+    DoctorProfileView,   
+    AdminDashboardView   
 )
 
 # Mounted at /api/v1/auth/
 urlpatterns = [
-    path("register/", PatientRegisterView.as_view(), name="patient-register"),
+    path("register/", RegisterView.as_view(), name="register"),
     path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("resend-verification/", ResendVerificationView.as_view(), name="resend-verification"),
     path("login/", LoginView.as_view(), name="login"),
@@ -24,15 +25,17 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
 ]
 
-# Mounted at /api/v1/patients/  ->  /api/v1/patients/dashboard/
+
 patient_urlpatterns = [
     path("dashboard/", PatientDashboardView.as_view(), name="patient-dashboard"),
 ]
 
-# Mounted at /api/v1/doctors/   ->  /api/v1/doctors/dashboard/
-# Mounted at /api/v1/doctors/   ->  /api/v1/doctors/dashboard/ and /me/
 doctor_urlpatterns = [
     path("dashboard/", DoctorDashboardView.as_view(), name="doctor-dashboard"),
     path("me/", DoctorProfileView.as_view(), name="doctor-me"),   # new
 ] 
+
+admin_urlpatterns = [
+    path("dashboard/", AdminDashboardView.as_view(), name="admin-dashboard"),
+]
 
